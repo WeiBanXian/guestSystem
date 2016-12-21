@@ -14,12 +14,15 @@ import {
     ScrollView,
     Dimensions,
     Alert,
+    ActivityIndicator,
     TouchableOpacity
 } from 'react-native';
 
 import Home from './Home.js';
 import Setting from './Setting.js';
-import Server from './server.js'
+import Server from './server.js';
+
+import Spinner from 'react-native-spinkit';
 
 const ratio = Dimensions.get('window').width / 1024;
 
@@ -30,7 +33,13 @@ export class Main extends React.Component {
         this.state={
             goBtnOpacity: 1,
             visitor: '',
-            clickNum: 0
+            showLoading: false,
+            clickNum: 0,
+            index: 2,
+            types: ['CircleFlip', 'Bounce', 'Wave', 'WanderingCubes', 'Pulse', 'ChasingDots', 'ThreeBounce', 'Circle', '9CubeGrid', 'WordPress', 'FadingCircle', 'FadingCircleAlt', 'Arc', 'ArcAlt'],
+            size: 70,
+            color: "#333333",
+            isVisible: true
         };
     }
 
@@ -39,6 +48,29 @@ export class Main extends React.Component {
         AsyncStorage.multiGet(["historyList", "domain"], function (error, result) {
             if (result.length > 0) {
                 Server.setDomain(result[1][1]);
+                if (!result[1][1]) {
+                    Alert.alert("连续点击caca五次，进行配置服务器地址！");
+                } else {
+                    _self.setState({
+                        showLoading: true
+                    }, function () {
+                        _self.onTimer = setTimeout(function () {
+                            Alert.alert("初始化失败，重新设置服务器地址！");
+                            _self.setState({
+                                showLoading: false
+                            });
+                        }, 1000);
+                    })
+                    console.log(Server.getDomain())
+                    Server.requestListHosts(function () {
+                        Server.requestListGuestPurpose(function () {
+                            clearTimeout(_self.onTimer);
+                            _self.setState({
+                                showLoading: false
+                            });
+                        });
+                    });
+                }
             }
         });
     }
@@ -69,7 +101,7 @@ export class Main extends React.Component {
 
     onPressButton() {
         if (this.state.visitor == '') {
-            Alert.alert("你名字都没有写！！！");
+            Alert.alert("请输入您的名字");
             return;
         }
         this.setState({
@@ -128,7 +160,6 @@ export class Main extends React.Component {
                                         visitor: text
                                     },function () {
                                         Server.setVisitor(this.state.visitor);
-                                        console.log(Server.getVisitor())
                                     })}
                                 }
                               />
@@ -151,65 +182,95 @@ export class Main extends React.Component {
                             />
                     </View>
                 </View>
+                <View style={[styles.loadingContainer, {left: this.state.showLoading?0:10000}]}>
+                    <View style={styles.loadingWrapper}>
+                        <Spinner style={styles.spinner} isVisible={this.state.isVisible} size={this.state.size} type={this.state.types[this.state.index]} color={this.state.color}/>
+                        <Text style={styles.loadingText}>正在初始化...</Text>
+                    </View>
+                </View>
             </ScrollView>
         )
     }
 }
 
 const styles = StyleSheet.create({
-  contentContainer: {
-    flex: 1
-  },
-  container: {
-    flex: 1,
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    paddingTop: 20,
-    backgroundColor: '#FDD339',
-  },
-  wrapper: {
-    flex: 1,
-    marginTop: 100*ratio,
-    marginBottom: 160*ratio,
-    justifyContent: 'space-around',
-    alignItems: 'center'
-  },
-  welcome: {
-    width: 467*ratio,
-    height: 72*ratio
-  },
-  caca: {
-    width: 544*ratio,
-    height: 544*ratio
-  },
-  content: {
-    flexDirection: 'row'
-  },
-  input: {
-    width: 504*ratio,
-    height: 107*ratio,
-    marginRight: 27*ratio,
-    paddingHorizontal: 30*ratio,
-    borderRadius: 5,
-    fontSize: 40*ratio,
-    backgroundColor: '#FFF'
-  },
-  button_go: {
-    width: 134*ratio,
-    height: 107*ratio,
-    borderRadius: 5
-  },
-  logoWrapper: {
-    flexDirection: 'column',
-    alignSelf: 'flex-end',
-    marginRight: 20*ratio,
-    marginBottom: 20*ratio
-  },
-  logo: {
-    width: 280*ratio,
-    height: 80*ratio,
-    alignSelf: 'flex-end'
-  }
+    contentContainer: {
+        flex: 1
+    },
+    container: {
+        flex: 1,
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        paddingTop: 20,
+        backgroundColor: '#FDD339',
+    },
+    wrapper: {
+        flex: 1,
+        marginTop: 100*ratio,
+        marginBottom: 160*ratio,
+        justifyContent: 'space-around',
+        alignItems: 'center'
+    },
+    welcome: {
+        width: 467*ratio,
+        height: 72*ratio
+    },
+    caca: {
+        width: 544*ratio,
+        height: 544*ratio
+    },
+    content: {
+        flexDirection: 'row'
+    },
+    input: {
+        width: 504*ratio,
+        height: 107*ratio,
+        marginRight: 27*ratio,
+        paddingHorizontal: 30*ratio,
+        borderRadius: 5,
+        fontSize: 40*ratio,
+        backgroundColor: '#FFF'
+    },
+    button_go: {
+        width: 134*ratio,
+        height: 107*ratio,
+        borderRadius: 5
+    },
+    logoWrapper: {
+        flexDirection: 'column',
+        alignSelf: 'flex-end',
+        marginRight: 20*ratio,
+        marginBottom: 20*ratio
+    },
+    logo: {
+        width: 280*ratio,
+        height: 80*ratio,
+        alignSelf: 'flex-end'
+    },
+    loadingContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    loadingWrapper: {
+        width: 500*ratio,
+        height: 240*ratio,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.9)',
+    },
+    loadingText: {
+        marginTop: 20*ratio,
+        fontSize: 36*ratio,
+        color: '#3E98FF',
+        textAlign: 'center'
+    }
 });
 
 module.exports = Main;

@@ -5,8 +5,10 @@ var Server = {
     },
 
     getDomain: function () {
-        // http://127.0.0.1:10081
         var domain = this._domain;
+        if (!domain) {
+            return false;
+        }
         var length = domain.length-1;
         if (domain[domain.length-1] == '/') {
             domain = domain.substring(0, length);
@@ -38,7 +40,31 @@ var Server = {
         return this._visitor;
     },
 
-    getListHosts: function (callback) {
+    setVisitorPhone: function (_visitorPhone) {
+        this._visitorPhone = _visitorPhone;
+    },
+
+    getVisitorPhone: function () {
+        return this._visitorPhone;
+    },
+
+    setListHostsData: function (_listHostsData) {
+        this._listHostsData = _listHostsData;
+    },
+
+    getListHostsData: function () {
+        return this._listHostsData || [];
+    },
+
+    setListGuestPurposeData: function (_listGuestPurposeData) {
+        this._listGuestPurposeData = _listGuestPurposeData;
+    },
+
+    getListGuestPurposeData: function () {
+        return this._listGuestPurposeData || [];
+    },
+
+    requestListHosts: function (callback) {
         fetch(this.getDomain() + '/listHosts',
             {
                 method: 'GET',
@@ -50,14 +76,15 @@ var Server = {
         .then((response) => response.text())
         .then((responseText) => {
             var result = JSON.parse(responseText)
-            console.log(JSON.parse(responseText));
+            this.setListHostsData(result.data);
+            // console.log(responseText+"")
             callback && callback(result);
         })
         .catch((error) => {
-            console.warn(error);
+            console.log(error);
         });
     },
-    getListGuestPurpose: function () {
+    requestListGuestPurpose: function (callback) {
         fetch(this.getDomain() + '/listGuestPurpose',
             {
                 method: 'GET',
@@ -68,35 +95,44 @@ var Server = {
         })
         .then((response) => response.text())
         .then((responseText) => {
-            console.log(responseText);
+            var result = JSON.parse(responseText)
+            this.setListGuestPurposeData(result.data);
+            // console.log(responseText+"。。。。。。。。purpose")
+            callback && callback(result);
         })
         .catch((error) => {
-            console.warn(error);
+            console.log(error);
         });
     },
-    guestForm: function (callback) {
-
-        var data = {
-            purpose: this.getSelectedPurpose(),
-            hostData: this.getHostData(),
-            visitor: this.getVisitor()
+    guestForm: function (callback, failedCb) {
+        var host = '未知';
+        if (this.getHostData() != undefined && this.getHostData().name != undefined) {
+            host = this.getHostData().name;
         }
-        setTimeout(function () {
-            callback && callback();
-        }, 3000);
-        console.log(data)
-        return;
-        fetch(this.getDomain() + '/guestForm',
-            {
-                method: 'GET',
-                headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
+        var email = '未知';
+        var phone = '未知';
+        if (this.getVisitorPhone() != undefined) {
+            email = this.getVisitorPhone();
+            phone = this.getVisitorPhone();
+        }
+        var url = this.getDomain() + '/guestForm?guestName='+
+                this.getVisitor()+'&company=未知&email='+email+'&purpose='+
+                this.getSelectedPurpose()+'&host='+host+'&phone='+phone;
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
             }
         })
         .then((response) => response.text())
         .then((responseText) => {
-            console.log(responseText);
+            var result = JSON.parse(responseText)
+            if (result.status == 200) {
+                callback && callback();
+            } else {
+                failedCb && failedCb();
+            }
+            // console.log(result);
         })
         .catch((error) => {
             console.warn(error);
@@ -105,15 +141,16 @@ var Server = {
 
     Filter: function (text) {
         var searchResult = [];
-        var listHosts = this.data().data;
-        console.log(listHosts)
+        var listHosts = this.getListHostsData();
         var searchResultLength = 0;
         if (/^[a-zA-Z]*$/.test(text)) {
             text = text.toLowerCase();
             for (var i in listHosts) {
-                if (listHosts[i].account.indexOf(text) > -1) {
-                    searchResult.push(listHosts[i]);
-                    searchResultLength ++;
+                if (listHosts[i].account != undefined) {
+                    if (listHosts[i].account.indexOf(text) > -1) {
+                        searchResult.push(listHosts[i]);
+                        searchResultLength ++;
+                    }
                 }
                 if (searchResultLength > 5) {
                     break;
@@ -121,9 +158,11 @@ var Server = {
             }
         } else if (/^[\u4e00-\u9fa5]*$/.test(text)) {
             for (var i in listHosts) {
-                if (listHosts[i].name.indexOf(text) > -1) {
-                    searchResult.push(listHosts[i]);
-                    searchResultLength ++;
+                if (listHosts[i].name != undefined) {
+                    if (listHosts[i].name.indexOf(text) > -1) {
+                        searchResult.push(listHosts[i]);
+                        searchResultLength ++;
+                    }
                 }
                 if (searchResultLength > 5) {
                     break;
