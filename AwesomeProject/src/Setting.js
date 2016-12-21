@@ -12,11 +12,13 @@ import {
     TextInput,
     ListView,
     AsyncStorage,
+    ActivityIndicator,
     TouchableOpacity,
     TouchableHighlight
 } from 'react-native';
 
 import Server from './server.js';
+import Spinner from 'react-native-spinkit';
 
 const ratio = Dimensions.get('window').width / 1024;
 
@@ -29,7 +31,13 @@ class Setting extends Component {
             dataSource: ds.cloneWithRows([]),
             historyList: [],
             deleteData: '',
-            inputData: ''
+            showLoading: false,
+            inputData: '',
+            index: 2,
+            types: ['CircleFlip', 'Bounce', 'Wave', 'WanderingCubes', 'Pulse', 'ChasingDots', 'ThreeBounce', 'Circle', '9CubeGrid', 'WordPress', 'FadingCircle', 'FadingCircleAlt', 'Arc', 'ArcAlt'],
+            size: 70,
+            color: "#333333",
+            isVisible: true
         };
     }
 
@@ -37,9 +45,7 @@ class Setting extends Component {
         var _self = this;
         AsyncStorage.multiGet(["historyList", "domain"], function (error, result) {
             if (result.length > 0) {
-                // return
                 if (result[1][1]) {
-                // Alert.alert(JSON.stringify(JSON.parse(result[0][1]).reverse()))
                     var ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
                     _self.setState({
                         dataSource: ds.cloneWithRows(JSON.parse(result[0][1]).reverse()),
@@ -62,7 +68,7 @@ class Setting extends Component {
         var _self = this;
         var inputData = this.state.inputData+'';
         if (inputData == '') {
-            Alert.alert('设置下服务地址嘛~~')
+            Alert.alert('请设置服务地址')
             return;
         }
         Server.setDomain(inputData);
@@ -81,11 +87,38 @@ class Setting extends Component {
             return res;
         }
         historyList = historyList.unique();
-        AsyncStorage.multiSet([["historyList", JSON.stringify(historyList)], ["domain", inputData]], function (error) {
-            if (error) {
-                console.warn(error)
-            } else {
-                _self.props.navigator.pop()
+        AsyncStorage.multiGet(["historyList", "domain"], function (error, result) {
+            if (result.length > 0) {
+                if (result[1][1] == inputData) {
+                    _self.props.navigator.pop()
+                } else {
+                    _self.setState({
+                        showLoading: true
+                    }, function () {
+                        _self.timer = setTimeout(function () {
+                            Alert.alert("新设置地址不正确，重新设置服务器地址！");
+                            _self.setState({
+                                showLoading: false
+                            });
+                        }, 20000);
+                    })
+                    AsyncStorage.multiSet([["historyList", JSON.stringify(historyList)], ["domain", inputData]], function (error) {
+                        if (error) {
+                            console.warn(error)
+                        } else {
+                            Server.setDomain(inputData);
+                            Server.requestListHosts(function () {
+                                Server.requestListGuestPurpose(function () {
+                                    clearTimeout(_self.timer);
+                                    _self.setState({
+                                        showLoading: false
+                                    });
+                                    _self.props.navigator.pop()
+                                });
+                            });
+                        }
+                    });
+                }
             }
         });
     }
@@ -196,6 +229,12 @@ class Setting extends Component {
                             />
                     </View>
                 </View>
+                <View style={[styles.loadingContainer, {left: this.state.showLoading?0:10000}]}>
+                    <View style={styles.loadingWrapper}>
+                        <Spinner style={styles.spinner} isVisible={this.state.isVisible} size={this.state.size} type={this.state.types[this.state.index]} color={this.state.color}/>
+                        <Text style={styles.loadingText}>正在重置服务地址...</Text>
+                    </View>
+                </View>
             </View>
         );
     }
@@ -303,6 +342,30 @@ const styles = StyleSheet.create({
     line: {
         height: 1,
         backgroundColor: '#E1E1E1'
+    },
+    loadingContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    loadingWrapper: {
+        width: 500*ratio,
+        height: 240*ratio,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.9)'
+    },
+    loadingText: {
+        marginTop: 20*ratio,
+        fontSize: 36*ratio,
+        color: '#3E98FF',
+        textAlign: 'center'
     }
 });
 

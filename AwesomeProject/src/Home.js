@@ -8,7 +8,7 @@ import {
     TextInput,
     Text,
     Image,
-    Alert,
+    AlertIOS,
     ListView,
     Dimensions,
     ActivityIndicator,
@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 
 import Server from './server.js';
+import Spinner from 'react-native-spinkit';
 
 const ratio = Dimensions.get('window').width / 1024;
 
@@ -29,30 +30,41 @@ class Home extends Component {
             dataPurposeSource: ds.cloneWithRows([]),
             listHosts: [],
             hostData: {},
-            selectedPurpose: '面试／',
+            selectedPurpose: '其他',
             showLoading: false,
-            showSearch: true
+            showSearch: true,
+            index: 2,
+            types: ['CircleFlip', 'Bounce', 'Wave', 'WanderingCubes', 'Pulse', 'ChasingDots', 'ThreeBounce', 'Circle', '9CubeGrid', 'WordPress', 'FadingCircle', 'FadingCircleAlt', 'Arc', 'ArcAlt'],
+            size: 70,
+            color: "#333333",
+            isVisible: true
         };
     }
 
     componentWillMount() {
         var _self = this;
-        // Server.getListHosts(function (result) {
-        //     Alert.alert(result.status + '')
-        // });
-        // Alert.alert(Server.data().status + '')
-        // Server.getListGuestPurpose();
-        // Server.guestForm()
+        // Server.setListGuestPurposeData([]);
+        // Server.setListHostsData([]);
         var ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
-        var data = Server.data().data;
-        var purposeData = Server.purposeData().data;
-        this.setState({
-            listHosts: data,
-            dataPurposeSource: ds.cloneWithRows(purposeData)
+        var purposeData = Server.getListGuestPurposeData() || [];
+        var listHostsData = Server.getListHostsData() || [];
+        console.log(purposeData.length)
+        if (purposeData.length == 0 || listHostsData.length == 0) {
+            AlertIOS.alert(
+              "请设置服务器，初始化数据",
+              '',
+              [
+                {text: 'OK', onPress: () => this.props.navigator.pop()}
+              ]
+            )
+        }
+        _self.setState({
+            listHosts: [],
+            dataPurposeSource: ds.cloneWithRows(purposeData),
+            showLoading: false
         }, function () {
             Server.setSelectedPurpose(_self.state.selectedPurpose);
         });
-        // Alert.alert(Dimensions.get('window').width+'')
     }
 
     isEmptyObject(obj) {
@@ -64,13 +76,15 @@ class Home extends Component {
 
     onPressButton() {
         var _self = this;
-        if (this.isEmptyObject(this.state.hostData)) {
-            Alert.alert("你是来找哪个哦！！！");
-            return;
-        }
-        if (this.state.selectedPurpose == '') {
-            Alert.alert("你是来干嘛的哦！！！");
-            return;
+        if (Server.getSelectedPurpose() != "面试") {
+            if (this.isEmptyObject(this.state.hostData)) {
+                AlertIOS.alert("请输入接访人");
+                return;
+            }
+            if (this.state.selectedPurpose == '') {
+                AlertIOS.alert("请选择来访目的");
+                return;
+            }
         }
         this.setState({
             showLoading: true
@@ -80,6 +94,11 @@ class Home extends Component {
                 showLoading: false
             })
             _self.props.navigator.pop()
+        }, function () {
+            AlertIOS.alert("服务器忙，请重试！");
+            _self.setState({
+                showLoading: false
+            })
         });
     }
 
@@ -91,6 +110,11 @@ class Home extends Component {
             dataSource: ds.cloneWithRows(search),
             showSearch: true
         })
+        if (text == '') {
+            this.setState({
+                showSearch: false
+            })
+        }
     }
 
     onChose(hostData) {
@@ -100,13 +124,26 @@ class Home extends Component {
             showSearch: false
         }, function () {
             Server.setHostData(_self.state.hostData);
-            console.log(Server.getHostData())
+            // console.log(Server.getHostData())
         });
     }
 
     onSelect(purpose) {
+        if (purpose == '面试') {
+            AlertIOS.prompt('请输入您的手机号', null, [{
+                        text: '确定',
+                        onPress: (text) => {
+                            Server.setVisitorPhone(text)
+                            this.onPressButton();
+                        }
+                    }, {
+                      text: '取消',
+                      style: 'cancel',
+                    }],
+                    "plain-text")
+        }
         var _self = this;
-        var purposeData = Server.purposeData().data;
+        var purposeData = Server.getListGuestPurposeData();
         var ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
         this.setState({
             selectedPurpose: purpose,
@@ -114,7 +151,6 @@ class Home extends Component {
             dataPurposeSource: ds.cloneWithRows(purposeData)
         }, function () {
             Server.setSelectedPurpose(_self.state.selectedPurpose);
-            console.log(Server.getSelectedPurpose())
         });
     }
 
@@ -183,7 +219,7 @@ class Home extends Component {
                             [
                                 styles.searchWrapper,
                                 {
-                                    top: this.state.showSearch?160:-999
+                                    top: this.state.showSearch?120:-999
                                 }
                             ]}>
                             <ListView
@@ -210,13 +246,8 @@ class Home extends Component {
                 </View>
                 <View style={[styles.loadingContainer, {left: this.state.showLoading?0:10000}]}>
                     <View style={styles.loadingWrapper}>
-                        <ActivityIndicator
-                            animating={this.state.showLoading}
-                            color='#FDD339'
-                            style={[styles.centering, {height: 80}]}
-                            size="large"
-                          />
-                        <Text style={styles.loadingText}>你等哈~</Text>
+                        <Spinner style={styles.spinner} isVisible={this.state.isVisible} size={this.state.size} type={this.state.types[this.state.index]} color={this.state.color}/>
+                        <Text style={styles.loadingText}>请稍等，正在提交...</Text>
                     </View>
                 </View>
             </View>
@@ -292,7 +323,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E1E1E1',
         backgroundColor: '#FAFAFA',
-        top: 160*ratio
+        top: 120*ratio
     },
     line: {
         height: 1,
@@ -328,13 +359,17 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     loadingWrapper: {
-        width: 200*ratio,
+        width: 500*ratio,
         height: 240*ratio,
-        borderRadius: 10
+        borderRadius: 10,
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        alignItems: 'center'
     },
     loadingText: {
+        marginTop: 20*ratio,
         fontSize: 36*ratio,
-        color: '#FDD339',
+        color: '#3E98FF',
         textAlign: 'center'
     }
 });
