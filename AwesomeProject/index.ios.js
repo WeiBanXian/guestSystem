@@ -3,14 +3,14 @@ import {
   AppRegistry,
   StyleSheet,
   Text,
-  Navigator,
+  NavigatorIOS,
   NavigatorBar,
   View
 } from 'react-native';
 
 import Home from './src/Home.js';
-import Main from './src/Main.js';
 import Setting from './src/Setting.js';
+import Purpose from './src/Purpose.js';
 
 export default class AwesomeProject extends Component {
 
@@ -19,29 +19,18 @@ export default class AwesomeProject extends Component {
         console.warn('YellowBox is disabled.');
     }
 
-    router(route, navigator) {
-        var ComponentClass = route.component,
-        rightView = route.rightView,
-        title = route.title,
-        onPress = route.onPress,
-        rightWrapperStyle = route.rightWrapperStyle,
-        props = route.passProps;
-        return (
-            <route.component navigator={navigator}  {...route} />
-        );
-    }
-
     render () {
         return (
-            <View style={styles.container}>
-                <Navigator
-                    style={styles.navigator}
-                    configureScene={(route, routeStack) => Navigator.SceneConfigs.FloatFromRight}
-                    initialRoute={{
-                        component: Main
-                    }}
-                    renderScene={this.router} />
-            </View>
+            <NavigatorIOS
+                style={styles.container}
+                barTintColor="#FDD339"
+                tintColor="#FFF"
+                titleTextColor="#FFF"
+                initialRoute={{
+                    component: Home,
+                    title: '首页'
+                }}
+            />
         )
     }
 }

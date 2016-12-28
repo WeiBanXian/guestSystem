@@ -60,10 +60,6 @@ class Setting extends Component {
         });
     }
 
-    onBackButton() {
-        this.props.navigator.pop()
-    }
-
     onPressButton() {
         var _self = this;
         var inputData = this.state.inputData+'';
@@ -181,22 +177,6 @@ class Setting extends Component {
     render() {
         return (
             <View style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={{flex: 1}}
-                        activeOpacity={0.6}
-                        onPress={() => this.onBackButton()}>
-                        <View style={styles.backWrapper}>
-                            <Image
-                                style={styles.backImg}
-                                source={require('./../resource/images/back.png')}
-                                />
-                            <Text style={styles.backText}>返回</Text>
-                        </View>
-                    </TouchableOpacity>
-                    <Text style={styles.title}>服务器设置</Text>
-                    <View style={styles.blank}></View>
-                </View>
                 <View style={styles.content}>
                     <View style={styles.inputWrapper}>
                         <View style={styles.inputContainer}>

@@ -1,38 +1,40 @@
-'use strict';
+/**
+ * 韦浩东
+ */
 
 import React, { Component } from 'react';
-
 import {
     StyleSheet,
-    View,
-    TextInput,
     Text,
     Image,
-    AlertIOS,
-    ListView,
+    TouchableHighlight,
+    TextInput,
+    View,
+    AsyncStorage,
+    ScrollView,
     Dimensions,
+    Alert,
     ActivityIndicator,
-    TouchableHighlight
+    TouchableOpacity
 } from 'react-native';
 
+import Purpose from './Purpose.js';
+import Setting from './Setting.js';
 import Server from './server.js';
+
 import Spinner from 'react-native-spinkit';
 
 const ratio = Dimensions.get('window').width / 1024;
 
-class Home extends Component {
+export class Home extends React.Component {
 
     constructor(props) {
         super(props);
-        var ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
-        this.state = {
-            dataSource: ds.cloneWithRows([]),
-            dataPurposeSource: ds.cloneWithRows([]),
-            listHosts: [],
-            hostData: {},
-            selectedPurpose: '其他',
+        this.state={
+            goBtnOpacity: 1,
+            visitor: '',
             showLoading: false,
-            showSearch: true,
+            clickNum: 0,
             index: 2,
             types: ['CircleFlip', 'Bounce', 'Wave', 'WanderingCubes', 'Pulse', 'ChasingDots', 'ThreeBounce', 'Circle', '9CubeGrid', 'WordPress', 'FadingCircle', 'FadingCircleAlt', 'Arc', 'ArcAlt'],
             size: 70,
@@ -43,310 +45,210 @@ class Home extends Component {
 
     componentWillMount() {
         var _self = this;
-        // Server.setListGuestPurposeData([]);
-        // Server.setListHostsData([]);
-        var ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
-        var purposeData = Server.getListGuestPurposeData() || [];
-        var listHostsData = Server.getListHostsData() || [];
-        console.log(purposeData.length)
-        if (purposeData.length == 0 || listHostsData.length == 0) {
-            AlertIOS.alert(
-              "请设置服务器，初始化数据",
-              '',
-              [
-                {text: 'OK', onPress: () => this.props.navigator.pop()}
-              ]
-            )
-        }
-        _self.setState({
-            listHosts: [],
-            dataPurposeSource: ds.cloneWithRows(purposeData),
-            showLoading: false
-        }, function () {
-            Server.setSelectedPurpose(_self.state.selectedPurpose);
+        AsyncStorage.multiGet(["historyList", "domain"], function (error, result) {
+            if (result.length > 0) {
+                Server.setDomain(result[1][1]);
+                if (!result[1][1]) {
+                    Alert.alert("连续点击caca五次，进行配置服务器地址！");
+                } else {
+                    _self.setState({
+                        showLoading: true
+                    }, function () {
+                        _self.onTimer = setTimeout(function () {
+                            Alert.alert("初始化失败，重新设置服务器地址！");
+                            _self.setState({
+                                showLoading: false
+                            });
+                        }, 1000);
+                    })
+                    console.log(Server.getDomain())
+                    Server.requestListHosts(function () {
+                        Server.requestListGuestPurpose(function () {
+                            clearTimeout(_self.onTimer);
+                            _self.setState({
+                                showLoading: false
+                            });
+                        });
+                    });
+                }
+            }
         });
     }
 
-    isEmptyObject(obj) {
-        for (var key in obj) {
-            return false;
+    onGoToSetting() {
+        var _self = this;
+        clearTimeout(this.timer)
+        if (this.state.clickNum == 4) {
+            this.setState({
+                clickNum: 0
+            }, function () {
+                _self.props.navigator.push({
+                    component: Setting,
+                    title: "设置服务器"
+                })
+            })
+        } else {
+            var clickNum = this.state.clickNum + 1;
+            this.setState({
+                clickNum: clickNum
+            })
+            this.timer = setTimeout(function () {
+                _self.setState({
+                    clickNum: 0
+                })
+            }, 1500);
         }
-        return true;
     }
 
     onPressButton() {
-        var _self = this;
-        if (Server.getSelectedPurpose() != "面试") {
-            if (this.isEmptyObject(this.state.hostData)) {
-                AlertIOS.alert("请输入接访人");
-                return;
-            }
-            if (this.state.selectedPurpose == '') {
-                AlertIOS.alert("请选择来访目的");
-                return;
-            }
+        if (this.state.visitor == '') {
+            Alert.alert("请输入您的名字");
+            return;
         }
         this.setState({
-            showLoading: true
+            visitor: ''
         })
-        Server.guestForm(function () {
-            _self.setState({
-                showLoading: false
-            })
-            _self.props.navigator.pop()
-        }, function () {
-            AlertIOS.alert("服务器忙，请重试！");
-            _self.setState({
-                showLoading: false
-            })
-        });
+        this.props.navigator.push({
+            component: Purpose,
+            title: "来访目的"
+        })
     }
 
-    onChangeText(text) {
-        var data = this.state.listHosts;
-        var search = Server.Filter(text);
-        var ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
-        this.setState({
-            dataSource: ds.cloneWithRows(search),
-            showSearch: true
-        })
-        if (text == '') {
+    onKeyPress(e) {
+        if (e.nativeEvent.key == 'Enter') {
             this.setState({
-                showSearch: false
+                visitor: ''
+            })
+            this.props.navigator.push({
+                component: Purpose,
+                title: "来访目的"
             })
         }
     }
 
-    onChose(hostData) {
-        var _self = this;
-        this.setState({
-            hostData: hostData,
-            showSearch: false
-        }, function () {
-            Server.setHostData(_self.state.hostData);
-            // console.log(Server.getHostData())
-        });
-    }
-
-    onSelect(purpose) {
-        if (purpose == '面试') {
-            AlertIOS.prompt('请输入您的手机号', null, [{
-                        text: '确定',
-                        onPress: (text) => {
-                            Server.setVisitorPhone(text)
-                            this.onPressButton();
-                        }
-                    }, {
-                      text: '取消',
-                      style: 'cancel',
-                    }],
-                    "plain-text")
-        }
-        var _self = this;
-        var purposeData = Server.getListGuestPurposeData();
-        var ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
-        this.setState({
-            selectedPurpose: purpose,
-            showSearch: false,
-            dataPurposeSource: ds.cloneWithRows(purposeData)
-        }, function () {
-            Server.setSelectedPurpose(_self.state.selectedPurpose);
-        });
-    }
-
-    renderRow(rowData) {
+    render () {
         return (
-            <TouchableHighlight
-                underlayColor="#F0D030"
-                onPress={() => this.onChose(rowData)}>
-                <Text style={styles.valueText}>{rowData.name}</Text>
-            </TouchableHighlight>
-        );
-    }
-
-    renderPurposeRow(rowData) {
-        var textColor = '#666';
-        if (rowData == this.state.selectedPurpose) {
-            textColor = '#3E98FF';
-        }
-        return (
-            <TouchableHighlight
-                underlayColor="#DDD"
-                onPress={() => this.onSelect(rowData)}>
-                <Text style={[styles.valueText, {color: textColor, backgroundColor: 'rgba(255,255,255,0)'}]}>{rowData}</Text>
-            </TouchableHighlight>
-        );
-    }
-
-    renderSeparator(rowData) {
-        return (<View style={styles.line} />)
-    }
-
-    render() {
-        return (
-            <View style={styles.container}>
-                <View style={styles.wrapper}>
-                    <View style={styles.content}>
-                        <Text style={styles.label}>接访人／Host</Text>
-                        <TextInput
-                            style={[styles.hostText, styles.borderText]}
-                            placeholder="姓名／Name"
-                            placeholderTextColor="#3E98FF"
-                            onChangeText={(text) => this.onChangeText(text)}
-                            onBlur={this.onTextInputBlur}
-                            defaultValue={this.state.hostData.name}
-                            autoCapitalize={'none'}
-                            autoCorrect={false}
-                            clearButtonMode={'while-editing'}
-                          />
-                        <Text style={styles.label}>来访目的／Purpose</Text>
-                        <View style={styles.purposeWrapper}>
-                            <ListView
-                                dataSource={this.state.dataPurposeSource}
-                                renderRow={this.renderPurposeRow.bind(this)}
-                                renderSeparator ={this.renderSeparator}
-                                removeClippedSubviews={false}
-                                bounces={false}
-                                />
-                        </View>
-                        <TouchableHighlight
-                            style={styles.button}
-                            underlayColor="#F0D030"
-                            onPress={() => this.onPressButton()}>
-                            <Text style={styles.buttonText}>完成</Text>
-                        </TouchableHighlight>
-                        <View style={
-                            [
-                                styles.searchWrapper,
-                                {
-                                    top: this.state.showSearch?120:-999
-                                }
-                            ]}>
-                            <ListView
-                                dataSource={this.state.dataSource}
-                                renderRow={this.renderRow.bind(this)}
-                                renderSeparator ={this.renderSeparator}
-                                removeClippedSubviews={false}
-                                bounces={false}
-                                />
-                        </View>
+            <ScrollView
+                bounces={false}
+                automaticallyAdjustContentInsets={false}
+                contentContainerStyle={styles.contentContainer}>
+                <View style={styles.container}>
+                    <View style={styles.wrapper}>
                         <Image
-                            style={styles.caca}
-                            resizeMode="cover"
-                            source={require('./../resource/images/caca2.png')}
+                            resizeMode="contain"
+                            style={styles.welcome}
+                            source={require('./../resource/images/welcome.png')}
+                            />
+                        <TouchableOpacity
+                            activeOpacity={0.6}
+                            onPress={() => this.onGoToSetting()}>
+                            <Image
+                                resizeMode="contain"
+                                style={styles.caca}
+                                source={require('./../resource/images/caca.png')}
+                                />
+                        </TouchableOpacity>
+                        <View style={styles.content}>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="姓名／name"
+                                returnKeyType="go"
+                                autoCapitalize={'none'}
+                                autoCorrect={false}
+                                defaultValue={this.state.visitor}
+                                enablesReturnKeyAutomatically={true}
+                                onKeyPress={this.onKeyPress.bind(this)}
+                                onChangeText={(text) => {
+                                    var _self = this;
+                                    this.setState({
+                                        visitor: text
+                                    },function () {
+                                        Server.setVisitor(this.state.visitor);
+                                    })}
+                                }
+                              />
+                            <TouchableHighlight
+                                style={styles.button_go}
+                                onPress={() => this.onPressButton()}>
+                                <Image
+                                    resizeMode="contain"
+                                    style={styles.button_go}
+                                    source={require('./../resource/images/button_go.png')}
+                                    />
+                            </TouchableHighlight>
+                        </View>
+                    </View>
+                    <View style={styles.logoWrapper}>
+                        <Image
+                            resizeMode="contain"
+                            style={styles.logo}
+                            source={require('./../resource/images/logo.png')}
                             />
                     </View>
-                </View>
-                <View style={styles.logoWrapper}>
-                    <Image
-                        resizeMode="contain"
-                        style={styles.logo}
-                        source={require('./../resource/images/logo_y.png')}
-                        />
                 </View>
                 <View style={[styles.loadingContainer, {left: this.state.showLoading?0:10000}]}>
                     <View style={styles.loadingWrapper}>
                         <Spinner style={styles.spinner} isVisible={this.state.isVisible} size={this.state.size} type={this.state.types[this.state.index]} color={this.state.color}/>
-                        <Text style={styles.loadingText}>请稍等，正在提交...</Text>
+                        <Text style={styles.loadingText}>正在初始化...</Text>
                     </View>
                 </View>
-            </View>
-        );
+            </ScrollView>
+        )
     }
 }
 
 const styles = StyleSheet.create({
+    contentContainer: {
+        flex: 1,
+        backgroundColor: '#FDD339'
+    },
     container: {
         flex: 1,
-        backgroundColor: '#FFF'
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        marginTop: 20,
     },
     wrapper: {
         flex: 1,
-        paddingTop: 120*ratio,
-        justifyContent: 'center',
+        marginTop: 100*ratio,
+        marginBottom: 160*ratio,
+        justifyContent: 'space-around',
         alignItems: 'center'
+    },
+    welcome: {
+        width: 467*ratio,
+        height: 72*ratio
     },
     caca: {
-        position: 'absolute',
-        top: -124*ratio,
-        right: -30*ratio,
-        width: 200*ratio,
-        height: 200*ratio
+        width: 544*ratio,
+        height: 544*ratio
     },
-    label: {
-        fontSize: 30*ratio,
-        color: '#999',
-        marginBottom: 13*ratio
+    content: {
+        flexDirection: 'row'
     },
-    borderText: {
-        width: 667*ratio,
+    input: {
+        width: 504*ratio,
         height: 107*ratio,
+        marginRight: 27*ratio,
         paddingHorizontal: 30*ratio,
         borderRadius: 5,
-        borderWidth: 1,
-        borderColor: '#E1E1E1',
-        color: '#3E98FF',
-        fontSize: 37*ratio,
-        lineHeight: 107*ratio,
-        textAlign: 'center',
+        fontSize: 40*ratio,
         backgroundColor: '#FFF'
     },
-    hostText: {
-        marginBottom: 40*ratio
-    },
-    button: {
-        width: 667*ratio,
+    button_go: {
+        width: 134*ratio,
         height: 107*ratio,
-        borderRadius: 5,
-        backgroundColor: '#FDD339',
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    buttonText: {
-        fontSize: 40*ratio,
-        color: '#FFF',
+        borderRadius: 5
     },
     logoWrapper: {
-        flexDirection: 'column',
-        alignSelf: 'flex-end',
-        marginRight: 20*ratio,
-        marginBottom: 20*ratio
+        position: 'absolute',
+        right: 20*ratio,
+        bottom: 20*ratio
     },
     logo: {
         width: 280*ratio,
         height: 80*ratio,
         alignSelf: 'flex-end'
-    },
-    searchWrapper: {
-        position: 'absolute',
-        borderRadius: 5,
-        borderWidth: 1,
-        borderColor: '#E1E1E1',
-        backgroundColor: '#FAFAFA',
-        top: 120*ratio
-    },
-    line: {
-        height: 1,
-        backgroundColor: '#E1E1E1'
-    },
-    valueText: {
-        width: 667*ratio,
-        height: 107*ratio,
-        paddingHorizontal: 30*ratio,
-        color: '#666',
-        fontSize: 37*ratio,
-        lineHeight: 107*ratio,
-        textAlign: 'center',
-        backgroundColor: '#FAFAFA'
-    },
-    purposeWrapper: {
-        width: 667*ratio,
-        height: 432*ratio,
-        marginBottom: 40*ratio,
-        borderRadius: 5,
-        borderWidth: 1,
-        borderColor: '#E1E1E1',
-        backgroundColor: '#FFF',
     },
     loadingContainer: {
         position: 'absolute',
@@ -363,8 +265,8 @@ const styles = StyleSheet.create({
         height: 240*ratio,
         borderRadius: 10,
         justifyContent: 'center',
+        alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.9)',
-        alignItems: 'center'
     },
     loadingText: {
         marginTop: 20*ratio,
@@ -374,4 +276,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default Home;
+module.exports = Home;
